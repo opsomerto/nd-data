@@ -1,18 +1,5 @@
 # ND-data
 
-## Python Formatting
-
-This repo uses Ruff for formatting and lightweight linting.
-
-```bash
-uv run ruff format .
-uv run ruff check --fix .
-```
-
-VS Code users should install the recommended Ruff extension; project settings format Python files on save.
-
-
-
 ## Tricoteuses API Models & Client
 
 Install datamodel-codegen
