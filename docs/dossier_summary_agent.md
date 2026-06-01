@@ -126,6 +126,22 @@ Tricoteuse expose dans le schéma :
 
 Mais un échantillon de dossiers récents avec `include=["themes"]` n'a retourné aucun thème rempli, y compris pour des dossiers ayant `senatChemin`. Les endpoints séparés testés (`/themes`, `/dossier-themes`, etc.) retournent `404`. Conclusion actuelle : le schéma le permet, mais la donnée n'est pas disponible dans l'API publique telle qu'utilisée ici.
 
+On ajoute donc un enrichissement séparé à partir du CSV Sénat `dossiers-legislatifs.csv`, en reprenant la logique historique de `scripts/old/compute_dossier_theme.py` :
+
+1. charger le CSV Sénat ;
+2. extraire l'identifiant du dossier depuis l'URL Sénat, par exemple `pjl25-635.html` ;
+3. faire la correspondance avec `Dossier.senatChemin` ;
+4. stocker les thèmes Sénat dans `senat_theme_enrichment`, sans remplacer les thèmes produits par l'agent.
+
+Script :
+
+```bash
+uv run scripts/enrich_senat_themes.py --source mongo --dry-run
+uv run scripts/enrich_senat_themes.py --source tricoteuse --limit 100
+```
+
+Le mode `mongo` parcourt les dossiers déjà présents dans `dossiers_enrichis`. Le mode `tricoteuse` parcourt l'API et upsert les dossiers qui ont un `senatChemin`.
+
 ## Batch CLI
 
 Exemples :

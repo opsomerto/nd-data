@@ -16,8 +16,6 @@ from typing import Any
 
 import dotenv
 import typer
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -26,6 +24,7 @@ if str(ROOT) not in sys.path:
 from nd_data.dossier_summary import SummaryModule, enrich_dossier_summary
 from nd_data.dossier_summary.agents import AGENT_VERSION, DEFAULT_MODEL
 from nd_data.dossier_summary.config import SETTINGS
+from nd_data.dossier_summary.mongo import get_mongo_collection
 from nd_data.dossier_summary.runner import parse_modules
 from nd_data.tricoteuse_api import TricoteuseAPIClient
 from nd_data.tricoteuse_models import Dossier
@@ -36,16 +35,6 @@ dotenv.load_dotenv()
 DEFAULT_DB = SETTINGS.mongo_db
 DEFAULT_COLLECTION = SETTINGS.mongo_collection
 app = typer.Typer(help="Enrich dossiers with summary agents.", no_args_is_help=True)
-
-
-def get_mongo_collection(db_name: str, collection_name: str):
-    mongo_pwd = os.environ["RC_MONGO_PWD"]
-    mongo_username = os.environ["RC_MONGO_USERNAME"]
-    mongo_host = os.environ["RC_MONGO_HOST"]
-    uri = f"mongodb+srv://{mongo_username}:{mongo_pwd}@{mongo_host}/?retryWrites=true&w=majority&appName=RC"
-    client = MongoClient(uri, server_api=ServerApi("1"))
-    client.admin.command("ping")
-    return client[db_name][collection_name]
 
 
 def parse_csv(value: str) -> list[str]:
