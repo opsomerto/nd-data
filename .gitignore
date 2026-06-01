@@ -20,6 +20,7 @@ venv/
 # Build / packaging
 build/
 dist/
+uv.lock
 
 # Local editor / agent state
 .DS_Store
