@@ -1,21 +1,15 @@
 """Add hand-curated Sénat themes to the enriched dossier collection."""
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Literal
 
 import dotenv
 import typer
 from pymongo import UpdateOne
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
 from nd_data.dossier_summary.config import SETTINGS
 from nd_data.dossier_summary.mongo import get_mongo_collection
-from nd_data.dossier_summary.senat_themes import find_senat_themes, load_senat_theme_index
+from nd_data.dossier_summary.themes import find_senat_themes, load_senat_theme_index
 from nd_data.tricoteuse_api import TricoteuseAPIClient
 
 

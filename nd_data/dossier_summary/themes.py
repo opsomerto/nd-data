@@ -1,7 +1,10 @@
-"""Canonical Senat theme labels for dossier summary enrichment."""
+"""Canonical Sénat theme labels and hand-curated theme loading."""
 
+import csv
 import re
 import unicodedata
+from dataclasses import dataclass
+from urllib.request import urlopen
 
 
 THEMES_SENAT_PRETTY: tuple[str, ...] = (
@@ -40,6 +43,16 @@ THEMES_SENAT_PRETTY: tuple[str, ...] = (
     "Affaires étrangères et coopération",
 )
 
+SENAT_DOSSIERS_CSV_URL = "https://data.senat.fr/data/dosleg/dossiers-legislatifs.csv"
+
+
+@dataclass
+class SenatThemeMatch:
+    senat_id: str
+    source_url: str
+    labels_pretty: list[str]
+    labels: list[str]
+
 
 def slugify_theme(label: str) -> str:
     """Normalize a Senat theme label for storage."""
@@ -71,3 +84,60 @@ def pretty_senat_theme(label_or_pretty: str) -> str:
     """Return the display label for a storage label or pretty label."""
     label = normalize_senat_theme(label_or_pretty)
     return THEME_LABEL_TO_PRETTY.get(label, label_or_pretty)
+
+
+def senat_id_from_url(senat_url: str | None) -> str | None:
+    """Extract the Sénat dossier filename used as the stable CSV join key."""
+    if not senat_url:
+        return None
+    return senat_url.rstrip("/").split("/")[-1]
+
+
+def split_senat_theme_labels(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def load_senat_theme_index(csv_url: str = SENAT_DOSSIERS_CSV_URL) -> dict[str, SenatThemeMatch]:
+    """Load Sénat dossier themes keyed by Sénat dossier filename.
+
+    The CSV may contain several rows for the same dossier. We keep the first row with
+    non-empty themes, following the useful part of the old theme computation script.
+    """
+    with urlopen(csv_url) as response:
+        rows = csv.DictReader(
+            (line.decode("latin-1") for line in response.readlines()),
+            delimiter=";",
+        )
+        index: dict[str, SenatThemeMatch] = {}
+        for row in rows:
+            source_url = row.get("URL du dossier", "")
+            senat_id = senat_id_from_url(source_url)
+            if not senat_id:
+                continue
+            labels_pretty = split_senat_theme_labels(row.get("Thèmes"))
+            if senat_id in index and index[senat_id].labels_pretty:
+                continue
+            if not labels_pretty and senat_id in index:
+                continue
+            index[senat_id] = SenatThemeMatch(
+                senat_id=senat_id,
+                source_url=source_url,
+                labels_pretty=labels_pretty,
+                labels=[normalize_senat_theme(label) for label in labels_pretty],
+            )
+    return index
+
+
+def find_senat_themes(
+    senat_chemin: str | None,
+    index: dict[str, SenatThemeMatch],
+) -> SenatThemeMatch | None:
+    senat_id = senat_id_from_url(senat_chemin)
+    if not senat_id:
+        return None
+    match = index.get(senat_id)
+    if match and match.labels:
+        return match
+    return None

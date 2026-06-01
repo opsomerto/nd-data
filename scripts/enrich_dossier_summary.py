@@ -8,18 +8,12 @@ Examples:
 
 import os
 import random
-import sys
 import time
 from collections.abc import Iterable
-from pathlib import Path
 from typing import Any
 
 import dotenv
 import typer
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from nd_data.dossier_summary import SummaryModule, enrich_dossier_summary
 from nd_data.dossier_summary.agents import AGENT_VERSION, DEFAULT_MODEL

@@ -1,9 +1,9 @@
-from nd_data.dossier_summary.senat_themes import (
+from nd_data.dossier_summary.themes import (
     find_senat_themes,
     senat_id_from_url,
     split_senat_theme_labels,
 )
-from nd_data.dossier_summary.senat_themes import SenatThemeMatch
+from nd_data.dossier_summary.themes import SenatThemeMatch
 
 
 def test_senat_id_from_url():
