@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from nd_data.dossier_summary.models import ActeurConcerne, Enjeu, StructuredSummary
 
 
@@ -8,8 +11,9 @@ def test_structured_summary_new_shape():
         enjeux=[
             Enjeu(
                 sujet="Transparence numérique",
-                importance="Les utilisateurs doivent comprendre pourquoi des contenus sont retirés.",
-                arbitrages="Équilibre entre libertés publiques et lutte contre les contenus illicites.",
+                importance="elevee",
+                description="Les utilisateurs doivent comprendre pourquoi des contenus sont retirés.",
+                arbitrage="Équilibre entre libertés publiques et lutte contre les contenus illicites.",
             )
         ],
         ce_qui_change=[
@@ -25,4 +29,14 @@ def test_structured_summary_new_shape():
     )
 
     assert summary.enjeux[0].sujet == "Transparence numérique"
+    assert summary.enjeux[0].importance == "elevee"
     assert summary.ce_qui_change[0].startswith("Obliger")
+
+
+def test_enjeu_importance_is_constrained():
+    with pytest.raises(ValidationError):
+        Enjeu(
+            sujet="Transparence numérique",
+            importance="importante",
+            description="Les utilisateurs doivent comprendre les décisions de modération.",
+        )

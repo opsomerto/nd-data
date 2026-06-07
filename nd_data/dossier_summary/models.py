@@ -84,8 +84,9 @@ class Qualification(BaseModel):
 
 class Enjeu(BaseModel):
     sujet: str
-    importance: str
-    arbitrages: str | None = None
+    importance: Literal["faible", "moderee", "elevee", "critique"]
+    description: str
+    arbitrage: str | None = None
 
 
 class ActeurConcerne(BaseModel):

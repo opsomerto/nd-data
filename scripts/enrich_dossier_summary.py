@@ -9,7 +9,7 @@ Examples:
 import os
 import random
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 import dotenv
@@ -106,19 +106,21 @@ def build_update(enrichment, dossier: Dossier, modules: Iterable[SummaryModule])
     }
 
 
-def fetch_dossiers(
+def iter_dossiers(
     client: TricoteuseAPIClient,
     uid: str | None,
     chambre: str,
     per_page: int,
     limit: int | None,
-):
+) -> Iterator[Dossier]:
     includes = ["actesLegislatifs", "documents", "documentDeposeRef"]
     if uid:
         dossier = client.get_dossier(uid, include=includes)
-        return [dossier] if dossier else []
+        if dossier:
+            yield dossier
+        return
 
-    collected: list[Dossier] = []
+    seen = 0
     page = 1
     while True:
         batch = client.get_dossiers(
@@ -130,13 +132,28 @@ def fetch_dossiers(
         )
         if not batch:
             break
-        collected.extend(batch)
-        if limit and len(collected) >= limit:
-            return collected[:limit]
+        for dossier in batch:
+            yield dossier
+            seen += 1
+            if limit and seen >= limit:
+                return
         if len(batch) < per_page:
             break
         page += 1
-    return collected
+
+
+def count_dossiers(
+    client: TricoteuseAPIClient,
+    uid: str | None,
+    chambre: str,
+    limit: int | None,
+) -> int | None:
+    if uid:
+        return 1
+    total = client.get_dossiers_total(chambre=chambre)
+    if total is None:
+        return limit
+    return min(total, limit) if limit else total
 
 
 def is_retryable_error(exc: Exception) -> bool:
@@ -257,53 +274,69 @@ def main(
 
     api_client = TricoteuseAPIClient()
     collection = None if dry_run else get_mongo_collection(db, collection_name)
-    dossiers = fetch_dossiers(api_client, uid, chambre, per_page, limit)
-    print(f"Found {len(dossiers)} dossier(s).")
+    try:
+        total = run_with_retries(
+            lambda: count_dossiers(api_client, uid, chambre, limit),
+            max_attempts=retry_max_attempts,
+            base_seconds=retry_base_seconds,
+            max_seconds=retry_max_seconds,
+        )
+    except Exception as exc:
+        total = limit
+        typer.echo(f"[WARN] Could not fetch dossier count, streaming anyway: {exc}")
+    if total is None:
+        print("Found dossier count: unknown.")
+    else:
+        print(f"Found {total} dossier(s).")
 
     processed = skipped = errors = 0
-    for dossier in dossiers:
-        if not dossier or not dossier.uid:
-            continue
-        try:
-            existing = collection.find_one({"uid": dossier.uid}) if collection is not None else None
-            if not needs_processing(existing, parsed_modules, model, force):
-                skipped += 1
-                print(f"[SKIP] {dossier.uid} already processed")
+    dossiers = iter_dossiers(api_client, uid, chambre, per_page, limit)
+    with typer.progressbar(dossiers, length=total, label="Enriching dossiers") as progress:
+        for dossier in progress:
+            if not dossier or not dossier.uid:
                 continue
-
-            enrichment = run_with_retries(
-                lambda: enrich_dossier_summary(
-                    dossier,
-                    client=api_client,
-                    modules=parsed_modules,
-                    source_options=parsed_sources,
-                    model_name=model,
-                    combined=combined,
-                    include_pdf_text=include_pdf_text,
-                    fetch_debate_durations=deep_navette,
-                    fetch_amendment_count=deep_navette,
-                    max_source_chars=max_source_chars,
-                ),
-                max_attempts=retry_max_attempts,
-                base_seconds=retry_base_seconds,
-                max_seconds=retry_max_seconds,
-            )
-
-            if dry_run:
-                print(enrichment.model_dump_json(indent=2))
-            else:
-                collection.update_one(
-                    {"uid": dossier.uid},
-                    build_update(enrichment, dossier, parsed_modules),
-                    upsert=True,
+            try:
+                existing = (
+                    collection.find_one({"uid": dossier.uid}) if collection is not None else None
                 )
-            processed += 1
-            print(f"[OK] {dossier.uid} {dossier.titre!r}")
-            wait_between_dossiers(delay_seconds)
-        except Exception as exc:
-            errors += 1
-            print(f"[ERR] {dossier.uid} {dossier.titre!r}: {exc}")
-            wait_between_dossiers(delay_seconds)
+                if not needs_processing(existing, parsed_modules, model, force):
+                    skipped += 1
+                    typer.echo(f"[SKIP] {dossier.uid} already processed")
+                    continue
+
+                enrichment = run_with_retries(
+                    lambda: enrich_dossier_summary(
+                        dossier,
+                        client=api_client,
+                        modules=parsed_modules,
+                        source_options=parsed_sources,
+                        model_name=model,
+                        combined=combined,
+                        include_pdf_text=include_pdf_text,
+                        fetch_debate_durations=deep_navette,
+                        fetch_amendment_count=deep_navette,
+                        max_source_chars=max_source_chars,
+                    ),
+                    max_attempts=retry_max_attempts,
+                    base_seconds=retry_base_seconds,
+                    max_seconds=retry_max_seconds,
+                )
+
+                if dry_run:
+                    typer.echo(enrichment.model_dump_json(indent=2))
+                else:
+                    collection.update_one(
+                        {"uid": dossier.uid},
+                        build_update(enrichment, dossier, parsed_modules),
+                        upsert=True,
+                    )
+                processed += 1
+                typer.echo(f"[OK] {dossier.uid} {dossier.titre!r}")
+                wait_between_dossiers(delay_seconds)
+            except Exception as exc:
+                errors += 1
+                typer.echo(f"[ERR] {dossier.uid} {dossier.titre!r}: {exc}")
+                wait_between_dossiers(delay_seconds)
 
     print(f"Done. processed={processed} skipped={skipped} errors={errors}")
 

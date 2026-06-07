@@ -22,7 +22,7 @@ from nd_data.dossier_summary.themes import THEME_PRETTY_TO_LABEL
 
 dotenv.load_dotenv()
 
-AGENT_VERSION = "1.0"
+AGENT_VERSION = "1.1"
 DEFAULT_MODEL = SETTINGS.model
 
 
@@ -79,7 +79,12 @@ Consignes générales:
 Format attendu:
 - tldr: une phrase expliquant ce que ferait concrètement la loi si elle était adoptée.
 - pourquoi: 2 à 5 phrases expliquant le problème à l'origine du texte, les constats ou critiques qui motivent son dépôt, et le contexte pertinent.
-- enjeux: 2 à 5 enjeux majeurs si le texte s'y prête; 1 seul enjeu suffit pour un texte très ciblé. Pour chacun: sujet concerné, pourquoi c'est important, tensions ou arbitrages éventuels.
+- enjeux: 1 à 5 enjeux majeurs selon la portée du texte. Pour chacun:
+  - sujet: intitulé court de l'enjeu;
+  - importance: "faible", "moderee", "elevee" ou "critique";
+  - description: une phrase expliquant pourquoi cet enjeu compte concrètement, sans répéter le "pourquoi";
+  - arbitrage: intérêts en tension uniquement si un compromis est clairement identifiable, sinon null.
+- Pour les descriptions d'enjeux: pas de contexte général, pas de reformulation de l'origine du texte. Décris seulement l'effet ou le risque principal pour les acteurs concernés.
 - ce_qui_change: 2 à 6 mesures concrètes si le texte en contient plusieurs; 1 seule mesure suffit pour un texte court ou très ciblé. Chaque mesure commence par un verbe d'action et décrit précisément le mécanisme prévu.
 - acteurs_concernes: principaux acteurs touchés par le texte, avec l'impact concret pour chacun.
 - objectif: 1 à 3 phrases expliquant le résultat concret recherché.
@@ -151,7 +156,10 @@ Mission: produire l'ensemble de l'enrichissement du dossier:
 
 Respecte les consignes des trois modules:
 - thèmes Sénat: labels stockés parmi cette table;
-- résumé structuré: contenu du texte, pas procédure;
+- résumé structuré: contenu du texte, pas procédure; pour chaque enjeu, fournis `sujet`,
+  `importance` ("faible", "moderee", "elevee" ou "critique"), `description`, et
+  `arbitrage` seulement si une tension claire existe, sinon null; la `description`
+  doit tenir en une phrase et ne pas répéter le `pourquoi`;
 - navette: état de la procédure, appuyé sur navette_facts.
 
 Table des thèmes Sénat:

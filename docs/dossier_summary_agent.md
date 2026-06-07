@@ -167,6 +167,7 @@ Paramètres principaux :
 | PDF cache | `DOSSIER_SUMMARY_PDF_CACHE_DIR` | temp dir |
 
 Le retry cible les erreurs de type 429/rate limit, timeout et 5xx, avec backoff exponentiel et jitter.
+Le script récupère d'abord le total via les en-têtes de pagination Tricoteuse, puis traite les dossiers page par page avec une barre de progression. Il ne matérialise pas toute la liste des dossiers avant de commencer.
 
 ## Estimation tokens
 
@@ -204,7 +205,7 @@ Sortie attendue :
 |---|---|
 | `tldr` | une phrase expliquant ce que ferait concrètement le texte s'il était adopté |
 | `pourquoi` | 2 à 5 phrases sur le problème, les constats et le contexte |
-| `enjeux` | 2 à 5 enjeux structurés si le texte s'y prête ; 1 suffit pour un texte ciblé |
+| `enjeux` | 1 à 5 enjeux structurés avec `sujet`, `importance` (`faible`, `moderee`, `elevee`, `critique`), `description` concise et `arbitrage` nullable |
 | `ce_qui_change` | 2 à 6 mesures concrètes si le texte en contient plusieurs ; 1 suffit pour un texte court |
 | `acteurs_concernes` | acteurs touchés et impact concret pour chacun |
 | `objectif` | 1 à 3 phrases sur le résultat recherché |

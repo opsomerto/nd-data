@@ -335,6 +335,34 @@ class TricoteuseAPIClient:
             logger.error(f"Request error for '{resource_name}' list: {e}")
             raise TricoteuseAPIError(f"Request failed for '{resource_name}' list: {e}")
 
+    def get_list_total(
+        self,
+        resource_name: str,
+        **extra_params: Any,
+    ) -> Optional[int]:
+        """Return the total number of matching resources from API pagination headers."""
+        if resource_name not in RESOURCE_CONFIGS:
+            raise ValueError(
+                f"Unknown resource '{resource_name}'. Available resources: {list(RESOURCE_CONFIGS.keys())}"
+            )
+
+        config = RESOURCE_CONFIGS[resource_name]
+        url = self._build_url(config.endpoint)
+        params = self._build_params(page=1, per_page=1, **extra_params)
+
+        logger.debug(f"GET {url} params={params}")
+
+        try:
+            response = self.client.get(url, params=params)
+            self._handle_response(response, resource_name)
+            total = response.headers.get("total")
+            return int(total) if total is not None else None
+        except ValueError:
+            return None
+        except httpx.RequestError as e:
+            logger.error(f"Request error for '{resource_name}' total: {e}")
+            raise TricoteuseAPIError(f"Request failed for '{resource_name}' total: {e}")
+
     def get_with_computed(
         self,
         resource_name: str,
@@ -559,6 +587,10 @@ class TricoteuseAPIClient:
             chambre=chambre,
             **kwargs,
         )
+
+    def get_dossiers_total(self, chambre: Optional[str] = None, **kwargs) -> Optional[int]:
+        """Return the total number of dossiers matching the provided filters."""
+        return self.get_list_total("dossier", chambre=chambre, **kwargs)
 
     def get_acte_legislatif(
         self, uid: str, include: Optional[List[str]] = None, **kwargs
