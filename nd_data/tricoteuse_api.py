@@ -36,6 +36,7 @@ from nd_data.tricoteuse_models import (
     Debat,
     Document,
     Dossier,
+    Amendement,
     Mandat,
     Organe,
     Paragraphe,
@@ -92,6 +93,7 @@ RESOURCE_CONFIGS: Dict[str, ResourceConfig] = {
     "mandat": ResourceConfig(endpoint="mandats", model_class=Mandat),
     "organe": ResourceConfig(endpoint="organes", model_class=Organe),
     "acteur": ResourceConfig(endpoint="acteurs", model_class=Acteur),
+    "amendement": ResourceConfig(endpoint="amendements", model_class=Amendement),
 }
 
 
@@ -225,6 +227,21 @@ class TricoteuseAPIClient:
             )
 
     @staticmethod
+    def _normalize_raw_item(resource_name: str, raw_item: Dict[str, Any]) -> Dict[str, Any]:
+        """Patch known API/model shape drift before Pydantic validation."""
+        if resource_name != "amendement":
+            return raw_item
+        normalized = dict(raw_item)
+        for key in ("listeProgrammesPLFR", "listeProgrammesPLF"):
+            if isinstance(normalized.get(key), list):
+                normalized[key] = None
+        return normalized
+
+    def _validate_model(self, resource_name: str, raw_item: Dict[str, Any]) -> BaseModel:
+        config = RESOURCE_CONFIGS[resource_name]
+        return config.model_class.model_validate(self._normalize_raw_item(resource_name, raw_item))
+
+    @staticmethod
     def _extract_computed(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Extract computed fields (like _count) from raw API response.
@@ -273,7 +290,7 @@ class TricoteuseAPIClient:
         try:
             response = self.client.get(url, params=params)
             data = self._handle_response(response, resource_name, uid)
-            return config.model_class.model_validate(data.get("data"))
+            return self._validate_model(resource_name, data.get("data"))
         except TricoteuseAPIError as e:
             if e.status_code == 404:
                 return None
@@ -330,7 +347,7 @@ class TricoteuseAPIClient:
             response = self.client.get(url, params=params)
             data = self._handle_response(response, resource_name)
             items = data.get("data", [])
-            return [config.model_class.model_validate(item) for item in items]
+            return [self._validate_model(resource_name, item) for item in items]
         except httpx.RequestError as e:
             logger.error(f"Request error for '{resource_name}' list: {e}")
             raise TricoteuseAPIError(f"Request failed for '{resource_name}' list: {e}")
@@ -398,7 +415,7 @@ class TricoteuseAPIClient:
             response = self.client.get(url, params=params)
             response_data = self._handle_response(response, resource_name, uid)
             raw_data = response_data.get("data", {})
-            model = config.model_class.model_validate(raw_data)
+            model = self._validate_model(resource_name, raw_data)
             computed = self._extract_computed(raw_data)
             return ResourceResponse(data=model, _computed=computed)
         except TricoteuseAPIError as e:
@@ -456,7 +473,7 @@ class TricoteuseAPIClient:
             items = response_data.get("data", [])
             results = []
             for raw_item in items:
-                model = config.model_class.model_validate(raw_item)
+                model = self._validate_model(resource_name, raw_item)
                 computed = self._extract_computed(raw_item)
                 results.append(ResourceResponse(data=model, _computed=computed))
             return results
@@ -717,6 +734,32 @@ class TricoteuseAPIClient:
             sort=sort,
             include=include,
             debatUid=debatUid,
+            dossierRefUid=dossierRefUid,
+            **kwargs,
+        )
+
+    def get_amendement(
+        self, uid: str, include: Optional[List[str]] = None, **kwargs
+    ) -> Optional[Amendement]:
+        """Get an Amendement by its UID."""
+        return self.get("amendement", uid, include=include, **kwargs)
+
+    def get_amendements(
+        self,
+        page: int = 1,
+        per_page: int = 10,
+        sort: Optional[str] = None,
+        include: Optional[List[str]] = None,
+        dossierRefUid: Optional[str] = None,
+        **kwargs,
+    ) -> List[Amendement]:
+        """Get a list of Amendements with pagination."""
+        return self.get_list(
+            "amendement",
+            page=page,
+            per_page=per_page,
+            sort=sort,
+            include=include,
             dossierRefUid=dossierRefUid,
             **kwargs,
         )
