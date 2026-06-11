@@ -19,26 +19,28 @@ uv run datamodel-codegen \
 
 Once this is done we can use TricoteusesApiClient to query Tricoteuses Parlement API and get typed results.
 
-### Retrieving debates for a dossier
+### Retrieving séance debates for a dossier
 
 The Tricoteuses model does not expose a direct `Dossier -> Debat` relation. The reliable path is through the agenda / ordre du jour:
 
 1. Start from the dossier UID.
-2. Fetch the dossier with `pointsOdj` included, or fetch interventions with `dossierRefUid=<dossier_uid>`.
-3. For each `PointOdj`, use:
-   - `dossierLegislatifUid` to confirm it belongs to the dossier
-   - `agendaRefUid` to retrieve the related reunion
-   - `ordrePoint` to isolate the relevant part of the debate
-4. Fetch the related `Agenda` / reunion and use `compteRenduRefUid` or `compteRenduRef` to get the `Debat`.
-5. Fetch the `Debat` with `paragraphes`, then keep only paragraphs for the dossier:
-   - preferably `Paragraphe.dossierRefUid == dossier.uid`
-   - or `Paragraphe.pointOdjRefUid == point_odj.uid`
-   - or `Paragraphe.valeurPtsOdj == str(point_odj.ordrePoint)` when filtering a full seance debate
+2. Fetch the dossier with `actesLegislatifs` included.
+3. Keep `ActeLegislatif` rows where `codeActe` contains `DEBATS-SEANCE`.
+4. For each séance act, fetch the related `Agenda` / reunion via `acte.reunionRefUid`.
+5. Use `Agenda.compteRenduRefUid` or `compteRenduRef` to get the `Debat`.
+6. Fetch the `Debat` with `paragraphes`, then keep only paragraphs where
+   `Paragraphe.dossierRefUid == dossier.uid`.
+
+`PointOdj` is not used to discover séance debates because it also covers commission meetings.
+If `acte.pointOdjUid` is available, it can still enrich metadata or provide a fallback filter
+when paragraph `dossierRefUid` is missing.
+There is intentionally no global fallback to `/interventions?dossierRefUid=...`; if the
+acte/reunion/compte-rendu path fails, the batch logs the dossier for investigation.
 
 API shape:
 
 ```http
-GET /dossiers/{uid}?include=pointsOdj
+GET /dossiers/{uid}?include=actesLegislatifs
 GET /reunions/{agendaRefUid}?include=compteRenduRef
 GET /debats/{compteRenduRefUid}?include=paragraphes
 ```
