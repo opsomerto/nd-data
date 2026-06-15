@@ -139,9 +139,11 @@ Le résumé par discussion contient:
 - `dynamique_debat`;
 - `intervenants_stats`;
 - `groupes_stats`;
+- `input_stats`;
 - `source_refs`.
 
-Les synthèses par groupe incluent aussi une qualification de participation (`faible`, `moderee`, `forte`, `indetermine`) et, quand le groupe est reconnu, les statistiques agrégées correspondantes.
+Les synthèses par groupe incluent une qualification de participation (`faible`, `moderee`, `forte`, `indetermine`) et un `groupe_ref` quand le groupe est reconnu.
+Les statistiques agrégées correspondantes restent dans `groupes_stats`, pour éviter de dupliquer les compteurs dans les champs narratifs.
 `source_refs` référence le dossier, le débat, la réunion et le point d'ordre du jour, mais ne stocke pas la liste des UIDs d'interventions.
 
 La synthèse cumulative consomme uniquement les résumés par discussion, pas les interventions brutes.
