@@ -202,7 +202,6 @@ def attach_computed_refs(
             stat = stat or group_lookup.get(normalize_label(group_summary.groupe_ref.libelle))
         stat = stat or group_lookup.get(normalize_label(group_summary.groupe))
         if stat:
-            group_summary.stats = stat
             group_summary.participation = stat.participation
             group_summary.groupe_ref = group_summary.groupe_ref or stat.groupe
 
@@ -234,6 +233,7 @@ def build_discussion_enrichment(
         intervenants_stats=pack.intervenants_stats,
         groupes_stats=pack.groupes_stats,
         source_refs=pack.source_refs,
+        input_stats=pack.input_stats,
         input_truncated=pack.input_truncated,
         model_name=model_name,
         agent_version=AGENT_VERSION,

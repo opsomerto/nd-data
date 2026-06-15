@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from nd_data.debat_summary.agents import build_discussion_enrichment, discussion_summary_from_llm
 from nd_data.debat_summary.models import (
     DebateDynamics,
+    DebateInputStats,
     DebatDiscussionInputPack,
     DebatDiscussionSummary,
     DiscussionSourceRefs,
@@ -80,6 +81,16 @@ def test_build_discussion_enrichment_copies_metadata_without_raw_text():
                 "speaker_ids": ["A1"],
             }
         ],
+        input_stats=DebateInputStats(
+            paragraph_count=3,
+            speech_intervention_count=2,
+            procedure_event_count=1,
+            interruption_count=0,
+            original_speech_text_chars=120,
+            input_speech_text_chars=80,
+            input_sent_ratio=66.7,
+            input_truncated=True,
+        ),
         input_truncated=True,
     )
     summary = DebatDiscussionSummary(
@@ -112,9 +123,17 @@ def test_build_discussion_enrichment_copies_metadata_without_raw_text():
     assert enrichment.input_truncated
     assert enrichment.model_name == "test:model"
     assert enrichment.groupes_stats[0].groupe.uid == "G1"
-    assert enrichment.synthese_groupes[0].stats.word_count == 40
+    assert enrichment.groupes_stats[0].word_count == 40
     assert enrichment.synthese_groupes[0].participation == "forte"
     assert enrichment.positions_intervenants_principaux[0].acteur.uid == "A1"
+    assert enrichment.input_stats.paragraph_count == 3
+    assert enrichment.input_stats.speech_intervention_count == 2
+    assert enrichment.input_stats.input_sent_ratio == 66.7
+    assert enrichment.input_stats.input_truncated
+    stored_doc = enrichment.model_dump(mode="python")
+    assert "stats" not in stored_doc["synthese_groupes"][0]
+    assert stored_doc["groupes_stats"][0]["word_count"] == 40
+    assert stored_doc["input_stats"]["input_truncated"]
 
 
 def test_llm_output_schemas_do_not_include_computed_persistence_fields():
@@ -159,7 +178,7 @@ def test_discussion_summary_from_llm_maps_to_rich_summary_shape():
     assert isinstance(summary.positions_intervenants_principaux[0], SpeakerPosition)
     assert summary.positions_intervenants_principaux[0].acteur is None
     assert isinstance(summary.synthese_groupes[0], GroupSynthesis)
-    assert summary.synthese_groupes[0].stats is None
+    assert not hasattr(summary.synthese_groupes[0], "stats")
 
 
 def test_rich_summary_accepts_llm_dynamics_if_it_leaks_through():

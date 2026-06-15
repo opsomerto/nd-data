@@ -2,7 +2,11 @@
 
 from typing import Any
 
-from nd_data.debat_summary.models import CumulativeDebatSynthesis, DebatDiscussionEnrichment
+from nd_data.debat_summary.models import (
+    CumulativeDebatSynthesis,
+    DebatAlignmentDocument,
+    DebatDiscussionEnrichment,
+)
 from nd_data.dossier_summary.mongo import get_mongo_collection
 
 
@@ -18,8 +22,15 @@ def build_cumulative_update(synthesis: CumulativeDebatSynthesis) -> dict[str, An
     }
 
 
+def build_alignment_update(alignment: DebatAlignmentDocument) -> dict[str, Any]:
+    return {
+        "$set": alignment.model_dump(mode="python"),
+    }
+
+
 __all__ = [
     "build_cumulative_update",
+    "build_alignment_update",
     "build_discussion_update",
     "get_mongo_collection",
 ]

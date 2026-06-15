@@ -10,6 +10,7 @@ from nd_data.debat_summary.config import SETTINGS
 from nd_data.debat_summary.models import (
     CumulativeDebatInputPack,
     CumulativeDebatSynthesis,
+    DebatAlignmentDocument,
     DebatDiscussionEnrichment,
     DebatDiscussionInputPack,
 )
@@ -53,12 +54,14 @@ def locate_discussion_packs(
     dossier_uid: str,
     per_page: int = 100,
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
+    alignments: list[DebatAlignmentDocument] | None = None,
 ) -> list[DebatDiscussionInputPack]:
     return build_located_packs(
         client,
         dossier_uid,
         per_page=per_page,
         max_intervention_chars=max_intervention_chars,
+        alignments=alignments,
     )
 
 

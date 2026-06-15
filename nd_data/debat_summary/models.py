@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 Position = Literal["favorable", "defavorable", "reserve", "mixte", "indetermine"]
 ConflictLevel = Literal["faible", "modere", "fort", "indetermine"]
 ParticipationLevel = Literal["faible", "moderee", "forte", "indetermine"]
+AlignmentConfidence = Literal["high", "medium", "low", "unresolved"]
 
 
 class ActorRef(BaseModel):
@@ -80,6 +81,17 @@ class GroupStat(BaseModel):
     speaker_ids: list[str] = Field(default_factory=list)
 
 
+class DebateInputStats(BaseModel):
+    paragraph_count: int = 0
+    speech_intervention_count: int = 0
+    procedure_event_count: int = 0
+    interruption_count: int = 0
+    original_speech_text_chars: int = 0
+    input_speech_text_chars: int = 0
+    input_sent_ratio: float = 100.0
+    input_truncated: bool = False
+
+
 class DiscussionSourceRefs(BaseModel):
     dossier_uid: str
     debat_uid: str | None = None
@@ -94,6 +106,39 @@ class DiscussionOutlineItem(BaseModel):
     type_debat: str | None = None
     structure: str | None = None
     article: str | None = None
+
+
+class AlignmentCandidateScore(BaseModel):
+    dossier_uid: str
+    title: str | None = None
+    score: float = 0.0
+    evidence: list[str] = Field(default_factory=list)
+
+
+class DebatSectionAlignment(BaseModel):
+    real_ordre_point: str
+    section_title: str | None = None
+    section_type: str | None = None
+    matched_dossier_uid: str | None = None
+    confidence: AlignmentConfidence = "unresolved"
+    score: float = 0.0
+    paragraph_dossier_uids: list[str] = Field(default_factory=list)
+    paragraph_point_odj_uids: list[str] = Field(default_factory=list)
+    planned_point_odj_uid: str | None = None
+    planned_ordre_point: int | None = None
+    evidence: list[str] = Field(default_factory=list)
+    candidate_scores: list[AlignmentCandidateScore] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DebatAlignmentDocument(BaseModel):
+    debat_uid: str
+    reunion_uid: str | None = None
+    date_seance: datetime | None = None
+    chambre: str | None = None
+    sections: list[DebatSectionAlignment] = Field(default_factory=list)
+    algorithm_version: str
+    computed_at: datetime
 
 
 class DebatDiscussionInputPack(BaseModel):
@@ -122,6 +167,7 @@ class DebatDiscussionInputPack(BaseModel):
     procedure_events: list[DebateContextEvent] = Field(default_factory=list)
     interruptions: list[DebateContextEvent] = Field(default_factory=list)
     source_refs: DiscussionSourceRefs
+    input_stats: DebateInputStats = Field(default_factory=DebateInputStats)
     original_intervention_count: int = 0
     original_text_chars: int = 0
     input_text_chars: int = 0
@@ -162,7 +208,6 @@ class GroupSynthesis(BaseModel):
     groupe_ref: GroupRef | None = None
     position_dominante: Position = "indetermine"
     participation: ParticipationLevel = "indetermine"
-    stats: GroupStat | None = None
     synthese: str
     nuances_internes: str | None = None
     intervenants_cles: list[str] = Field(default_factory=list)
@@ -257,6 +302,7 @@ class DebatDiscussionEnrichment(DebatDiscussionSummary):
     intervenants_stats: list[SpeakerStat] = Field(default_factory=list)
     groupes_stats: list[GroupStat] = Field(default_factory=list)
     source_refs: DiscussionSourceRefs
+    input_stats: DebateInputStats = Field(default_factory=DebateInputStats)
     input_truncated: bool = False
     model_name: str
     agent_version: str

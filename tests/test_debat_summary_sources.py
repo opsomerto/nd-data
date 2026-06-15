@@ -234,6 +234,14 @@ def test_build_debat_discussion_packs_locates_and_enriches_speakers():
     assert pack.discussion_uid == "D1:R1:DEB1:P1"
     assert pack.input_truncated
     assert pack.original_intervention_count == 3
+    assert pack.input_stats.paragraph_count == 3
+    assert pack.input_stats.speech_intervention_count == 1
+    assert pack.input_stats.procedure_event_count == 1
+    assert pack.input_stats.interruption_count == 1
+    assert pack.input_stats.original_speech_text_chars == 45
+    assert pack.input_stats.input_speech_text_chars == 20
+    assert pack.input_stats.input_sent_ratio == 44.4
+    assert pack.input_stats.input_truncated
     assert pack.interventions[0].text == "Intervention importa"
     assert pack.speakers[0].display_name == "Alice Martin"
     assert pack.speakers[0].acteur.uid == "A1"

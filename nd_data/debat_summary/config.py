@@ -19,6 +19,10 @@ class DebatSummarySettings:
         "DEBAT_SUMMARY_CUMULATIVE_COLLECTION",
         "dossier_debat_syntheses",
     )
+    mongo_alignment_collection = os.environ.get(
+        "DEBAT_ALIGNMENT_COLLECTION",
+        "debat_section_alignments",
+    )
     max_intervention_chars = env_int("DEBAT_SUMMARY_MAX_INTERVENTION_CHARS", 40_000)
     batch_delay_seconds = env_float(
         "DEBAT_SUMMARY_BATCH_DELAY_SECONDS",

@@ -10,6 +10,8 @@ from nd_data.debat_summary.config import SETTINGS
 from nd_data.debat_summary.models import (
     ActorRef,
     DebateContextEvent,
+    DebateInputStats,
+    DebatAlignmentDocument,
     DebatDiscussionInputPack,
     DiscussionOutlineItem,
     DiscussionSourceRefs,
@@ -495,6 +497,12 @@ def cap_interventions(
     return excerpts, original_chars, input_chars, truncated
 
 
+def input_sent_ratio(original_chars: int, input_chars: int) -> float:
+    if original_chars <= 0:
+        return 100.0
+    return round((input_chars / original_chars) * 100, 1)
+
+
 def discussion_uid(
     dossier_uid: str,
     reunion_uid: str | None,
@@ -527,6 +535,16 @@ def build_discussion_pack(
     excerpts, original_chars, input_chars, truncated = cap_interventions(
         speech_interventions,
         max_intervention_chars,
+    )
+    input_stats = DebateInputStats(
+        paragraph_count=len(interventions),
+        speech_intervention_count=len(speech_interventions),
+        procedure_event_count=len(procedure_events),
+        interruption_count=len(interruptions),
+        original_speech_text_chars=original_chars,
+        input_speech_text_chars=input_chars,
+        input_sent_ratio=input_sent_ratio(original_chars, input_chars),
+        input_truncated=truncated,
     )
     ordre_point = active_point_order(reunion, point) if point else None
     debat_uid = debat.uid if debat else interventions[0].debatRefUid
@@ -571,6 +589,7 @@ def build_discussion_pack(
         procedure_events=procedure_events,
         interruptions=interruptions,
         source_refs=source_refs,
+        input_stats=input_stats,
         original_intervention_count=len(interventions),
         original_text_chars=original_chars,
         input_text_chars=input_chars,
@@ -630,6 +649,67 @@ def build_debat_discussion_packs(
     return dedupe_packs(packs)
 
 
+def build_debat_discussion_packs_from_alignments(
+    dossier: Dossier,
+    client: TricoteuseAPIClient,
+    alignments: list[DebatAlignmentDocument],
+    max_intervention_chars: int = SETTINGS.max_intervention_chars,
+) -> list[DebatDiscussionInputPack]:
+    if not dossier.uid:
+        return []
+    packs = []
+    for alignment in alignments:
+        matching_sections = [
+            section for section in alignment.sections if section.matched_dossier_uid == dossier.uid
+        ]
+        if not matching_sections:
+            continue
+        reunion = (
+            client.get_reunion(alignment.reunion_uid, include=["pointsOdj"])
+            if alignment.reunion_uid
+            else None
+        )
+        debat = client.get_debat(alignment.debat_uid, include=["paragraphes"])
+        if not debat or not debat.paragraphes:
+            continue
+        for section in matching_sections:
+            interventions = sort_interventions(
+                [
+                    paragraph
+                    for paragraph in debat.paragraphes
+                    if paragraph.valeurPtsOdj == section.real_ordre_point
+                ]
+            )
+            point = next(
+                (
+                    item
+                    for item in (reunion.pointsOdj if reunion else []) or []
+                    if item.uid == section.planned_point_odj_uid
+                ),
+                None,
+            )
+            if point is None and (
+                section.planned_point_odj_uid or section.planned_ordre_point is not None
+            ):
+                point = PointOdj(
+                    uid=section.planned_point_odj_uid,
+                    dossierLegislatifUid=dossier.uid,
+                    ordrePoint=section.planned_ordre_point,
+                )
+            pack = build_discussion_pack(
+                dossier,
+                interventions,
+                client,
+                reunion=reunion,
+                debat=debat,
+                point=point,
+                max_intervention_chars=max_intervention_chars,
+            )
+            if pack:
+                packs.append(pack)
+    return dedupe_packs(packs)
+
+
 def dedupe_packs(packs: list[DebatDiscussionInputPack]) -> list[DebatDiscussionInputPack]:
     seen = set()
     deduped = []
@@ -654,10 +734,18 @@ def locate_debat_discussion_packs(
     dossier_uid: str,
     per_page: int = 100,
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
+    alignments: list[DebatAlignmentDocument] | None = None,
 ) -> list[DebatDiscussionInputPack]:
     dossier = client.get_dossier(dossier_uid, include=["pointsOdj", "actesLegislatifs"])
     if not dossier:
         return []
+    if alignments is not None:
+        return build_debat_discussion_packs_from_alignments(
+            dossier,
+            client,
+            alignments,
+            max_intervention_chars=max_intervention_chars,
+        )
     return build_debat_discussion_packs(
         dossier,
         client,

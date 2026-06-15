@@ -155,6 +155,13 @@ def load_existing_discussion_summaries(collection, dossier_uid: str):
     return [DebatDiscussionEnrichment.model_validate(doc) for doc in docs]
 
 
+def load_alignment_docs(collection, dossier_uid: str):
+    from nd_data.debat_summary.models import DebatAlignmentDocument
+
+    docs = collection.find({"sections.matched_dossier_uid": dossier_uid})
+    return [DebatAlignmentDocument.model_validate(doc) for doc in docs]
+
+
 @app.command()
 def main(
     uid: str | None = typer.Option(None, help="Process a single dossier UID."),
@@ -184,6 +191,16 @@ def main(
         "--cumulative-collection",
         help=f"Mongo cumulative collection, default {SETTINGS.mongo_cumulative_collection}.",
     ),
+    use_alignment: bool = typer.Option(
+        True,
+        "--alignment/--no-alignment",
+        help="Use stored debate section alignments to select real debate sections.",
+    ),
+    alignment_collection_name: str = typer.Option(
+        SETTINGS.mongo_alignment_collection,
+        "--alignment-collection",
+        help=f"Mongo alignment collection, default {SETTINGS.mongo_alignment_collection}.",
+    ),
     delay_seconds: float = typer.Option(
         SETTINGS.batch_delay_seconds,
         help="Sleep between processed dossiers to avoid API/provider throttling.",
@@ -205,6 +222,7 @@ def main(
     print(f"Max intervention chars: {max_intervention_chars}")
     print(f"Cumulative synthesis: {cumulative}")
     print(f"Mongo: {db}.{discussion_collection_name} / {cumulative_collection_name}")
+    print(f"Alignment: {use_alignment} | Collection: {db}.{alignment_collection_name}")
     print(f"Dry-run: {dry_run} | Force: {force}")
 
     api_client = TricoteuseAPIClient()
@@ -213,6 +231,9 @@ def main(
     )
     cumulative_collection = (
         None if dry_run else get_mongo_collection(db, cumulative_collection_name)
+    )
+    alignment_collection = (
+        get_mongo_collection(db, alignment_collection_name) if use_alignment else None
     )
 
     try:
@@ -234,12 +255,22 @@ def main(
             if not dossier.uid:
                 continue
             try:
+                alignments = (
+                    load_alignment_docs(alignment_collection, dossier.uid)
+                    if alignment_collection is not None
+                    else None
+                )
+                if use_alignment and not alignments:
+                    typer.echo(f"[SKIP] {dossier.uid} no debate alignment found")
+                    skipped += 1
+                    continue
                 packs = run_with_retries(
                     lambda: locate_discussion_packs(
                         api_client,
                         dossier.uid,
                         per_page=per_page,
                         max_intervention_chars=max_intervention_chars,
+                        alignments=alignments,
                     ),
                     retry_max_attempts,
                     retry_base_seconds,
