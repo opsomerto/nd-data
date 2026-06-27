@@ -523,12 +523,13 @@ def build_discussion_pack(
     debat: Debat | None = None,
     point: PointOdj | None = None,
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
+    enrich_actors: bool = True,
 ) -> DebatDiscussionInputPack | None:
     if not dossier.uid or not interventions:
         return None
 
     speech_interventions, procedure_events, interruptions = split_intervention_lanes(interventions)
-    actors = build_actor_cache(speech_interventions, client)
+    actors = build_actor_cache(speech_interventions, client) if enrich_actors else {}
     speakers, stats = build_speaker_context(speech_interventions, actors)
     group_stats = build_group_stats(stats)
     sommaire_source = build_sommaire_source(interventions)
@@ -602,6 +603,7 @@ def build_debat_discussion_packs(
     client: TricoteuseAPIClient,
     per_page: int = 100,
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
+    enrich_actors: bool = True,
 ) -> list[DebatDiscussionInputPack]:
     packs = []
     actes = seance_debate_actes(dossier)
@@ -640,6 +642,7 @@ def build_debat_discussion_packs(
                 debat=debat,
                 point=point,
                 max_intervention_chars=max_intervention_chars,
+                enrich_actors=enrich_actors,
             )
             if pack:
                 packs.append(pack)
@@ -654,6 +657,7 @@ def build_debat_discussion_packs_from_alignments(
     client: TricoteuseAPIClient,
     alignments: list[DebatAlignmentDocument],
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
+    enrich_actors: bool = True,
 ) -> list[DebatDiscussionInputPack]:
     if not dossier.uid:
         return []
@@ -704,6 +708,7 @@ def build_debat_discussion_packs_from_alignments(
                 debat=debat,
                 point=point,
                 max_intervention_chars=max_intervention_chars,
+                enrich_actors=enrich_actors,
             )
             if pack:
                 packs.append(pack)
@@ -735,6 +740,7 @@ def locate_debat_discussion_packs(
     per_page: int = 100,
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
     alignments: list[DebatAlignmentDocument] | None = None,
+    enrich_actors: bool = True,
 ) -> list[DebatDiscussionInputPack]:
     dossier = client.get_dossier(dossier_uid, include=["pointsOdj", "actesLegislatifs"])
     if not dossier:
@@ -745,10 +751,12 @@ def locate_debat_discussion_packs(
             client,
             alignments,
             max_intervention_chars=max_intervention_chars,
+            enrich_actors=enrich_actors,
         )
     return build_debat_discussion_packs(
         dossier,
         client,
         per_page=per_page,
         max_intervention_chars=max_intervention_chars,
+        enrich_actors=enrich_actors,
     )

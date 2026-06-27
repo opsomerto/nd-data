@@ -120,6 +120,36 @@ Paramètres principaux:
 | `--cumulative-collection` | `DEBAT_SUMMARY_CUMULATIVE_COLLECTION` | `dossier_debat_syntheses` |
 | `--max-intervention-chars` | `DEBAT_SUMMARY_MAX_INTERVENTION_CHARS` | `40000` |
 
+## Estimation du volume et du budget
+
+Le script `scripts/estimate_debat_summary_budget.py` parcourt les dossiers, reconstruit les
+`DebatDiscussionInputPack`, mais n'appelle aucun fournisseur LLM. Il sert à compter:
+
+- le nombre de dossiers et discussions en séance;
+- le nombre de paragraphes, prises de parole, événements procéduraux et interruptions;
+- les caractères de prises de parole disponibles et envoyés selon plusieurs stratégies de
+  troncature;
+- une estimation de tokens et de coût pour les principaux fournisseurs.
+
+Exemples:
+
+```bash
+uv run scripts/estimate_debat_summary_budget.py --legislature 17
+uv run scripts/estimate_debat_summary_budget.py --uid DLR5L17N52428 --json
+uv run scripts/estimate_debat_summary_budget.py --strategies none,50000,100000,200000
+```
+
+Hypothèses par défaut:
+
+- législature courante: `17`;
+- stratégies de troncature: aucune, 50k, 100k, 200k caractères de prises de parole par discussion;
+- conversion approximative: 4 caractères par token;
+- sortie estimée: 1500 tokens par résumé de discussion et 2500 tokens par synthèse cumulative;
+- entrée cumulative estimée: 1000 tokens par résumé de discussion déjà produit.
+
+La table de prix est volontairement locale dans `nd_data/debat_summary/estimation.py`: les tarifs
+API changent souvent, donc elle doit être vérifiée avant de décider un budget réel.
+
 ## Sorties structurées
 
 L'agent utilise deux niveaux de modèles:

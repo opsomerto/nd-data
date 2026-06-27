@@ -55,6 +55,7 @@ def locate_discussion_packs(
     per_page: int = 100,
     max_intervention_chars: int = SETTINGS.max_intervention_chars,
     alignments: list[DebatAlignmentDocument] | None = None,
+    enrich_actors: bool = True,
 ) -> list[DebatDiscussionInputPack]:
     return build_located_packs(
         client,
@@ -62,6 +63,7 @@ def locate_discussion_packs(
         per_page=per_page,
         max_intervention_chars=max_intervention_chars,
         alignments=alignments,
+        enrich_actors=enrich_actors,
     )
 
 
