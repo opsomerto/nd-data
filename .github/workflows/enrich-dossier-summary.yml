@@ -1,0 +1,103 @@
+name: Enrich dossier summaries
+
+on:
+  schedule:
+    # GitHub schedules run in UTC. This is 05:00 in France during summer.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Maximum number of dossiers to process"
+        required: false
+        default: "100"
+      chambre:
+        description: "Chamber filter passed to Tricoteuse"
+        required: false
+        default: "AN"
+      modules:
+        description: "Comma-separated modules or all"
+        required: false
+        default: "all"
+      sources:
+        description: "Comma-separated source packs"
+        required: false
+        default: "initial"
+      combined:
+        description: "Use one combined LLM call"
+        required: false
+        default: true
+        type: boolean
+      force:
+        description: "Reprocess already enriched dossiers"
+        required: false
+        default: false
+        type: boolean
+      deep_navette:
+        description: "Fetch extra Tricoteuse metrics"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: enrich-dossier-summary
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      RC_MONGO_USERNAME: ${{ secrets.RC_MONGO_USERNAME }}
+      RC_MONGO_PWD: ${{ secrets.RC_MONGO_PWD }}
+      RC_MONGO_HOST: ${{ secrets.RC_MONGO_HOST }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      DOSSIER_SUMMARY_MODEL: ${{ vars.DOSSIER_SUMMARY_MODEL || 'mistral:mistral-medium-latest' }}
+      DOSSIER_SUMMARY_MONGO_DB: ${{ vars.DOSSIER_SUMMARY_MONGO_DB || 'parlement' }}
+      DOSSIER_SUMMARY_MONGO_COLLECTION: ${{ vars.DOSSIER_SUMMARY_MONGO_COLLECTION || 'dossiers_enrichis' }}
+      DOSSIER_SUMMARY_RETRY_MAX_ATTEMPTS: ${{ vars.DOSSIER_SUMMARY_RETRY_MAX_ATTEMPTS || '5' }}
+      DOSSIER_SUMMARY_RETRY_BASE_SECONDS: ${{ vars.DOSSIER_SUMMARY_RETRY_BASE_SECONDS || '1.5' }}
+      DOSSIER_SUMMARY_RETRY_MAX_SECONDS: ${{ vars.DOSSIER_SUMMARY_RETRY_MAX_SECONDS || '30.0' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Enrich dossier summaries
+        run: |
+          args=(
+            "--limit=${{ inputs.limit || '100' }}"
+            "--chambre=${{ inputs.chambre || 'AN' }}"
+            "--modules=${{ inputs.modules || 'all' }}"
+            "--sources=${{ inputs.sources || 'initial' }}"
+            "--model=${DOSSIER_SUMMARY_MODEL}"
+            "--max-source-chars=50000"
+            "--delay-seconds=2"
+          )
+
+          if [[ "${{ github.event_name == 'schedule' || inputs.combined }}" == "true" ]]; then
+            args+=("--combined")
+          fi
+
+          if [[ "${{ inputs.force || false }}" == "true" ]]; then
+            args+=("--force")
+          fi
+
+          if [[ "${{ github.event_name == 'schedule' || inputs.deep_navette }}" == "true" ]]; then
+            args+=("--deep-navette")
+          fi
+
+          uv run scripts/enrich_dossier_summary.py "${args[@]}"
